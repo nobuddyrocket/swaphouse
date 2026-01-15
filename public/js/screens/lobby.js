@@ -79,18 +79,11 @@ const LobbyScreen = {
         nameSpan.textContent += ' (You)';
       }
 
-      if (player.id === GameState.players.find(p => GameState.isHost && p.id === GameState.playerId)?.id ||
-        (GameState.players[0] && player.id === GameState.players[0].id)) {
-        if (player.id === (GameState.players[0]?.id)) {
-          // Check if this player is actually the host
-          const hostPlayer = GameState.players.find(p => p.id === GameState.playerId && GameState.isHost);
-          if (!hostPlayer || hostPlayer.id !== player.id) {
-            // This is another player who might be host
-          }
-        }
-      }
-
-      if (player.ready) {
+      // Show CPU indicator for bot players
+      if (player.isBot) {
+        statusSpan.textContent = 'CPU';
+        statusSpan.classList.add('cpu');
+      } else if (player.ready) {
         statusSpan.textContent = 'READY';
         statusSpan.classList.add('ready');
       } else {
@@ -123,13 +116,13 @@ const LobbyScreen = {
     // Show start button only for host
     if (GameState.isHost) {
       startBtn.classList.remove('hidden');
-      const allReady = GameState.players.every(p => p.ready);
-      startBtn.disabled = !allReady || GameState.players.length < 2;
+      // Only check human players for ready status (bots are always ready)
+      const humanPlayers = GameState.players.filter(p => !p.isBot);
+      const allHumansReady = humanPlayers.every(p => p.ready);
+      startBtn.disabled = !allHumansReady;
 
-      if (GameState.players.length < 2) {
-        lobbyMessage.textContent = 'Need at least 2 players to start';
-      } else if (!allReady) {
-        lobbyMessage.textContent = 'Waiting for all players to be ready...';
+      if (!allHumansReady) {
+        lobbyMessage.textContent = 'Click Ready to start...';
       } else {
         lobbyMessage.textContent = 'Ready to start!';
       }

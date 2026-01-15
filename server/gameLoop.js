@@ -3,6 +3,7 @@ const { MAP_DATA, getRandomSpawnPoints, getRandomSpawnPoint } = require('./mapDa
 const Physics = require('./physics');
 const NPC = require('./npc');
 const RoleManager = require('./roleManager');
+const BotAI = require('./botAI');
 
 function createInitialGameState() {
   return {
@@ -45,10 +46,20 @@ class GameLoop {
     this.interval = null;
     this.lastTick = Date.now();
     this.inputs = new Map(); // playerId -> current input state
+    this.bots = new Map(); // botId -> BotAI instance
   }
 
   start() {
     this.lastTick = Date.now();
+
+    // Initialize bot AI for each bot player
+    this.room.players.forEach(player => {
+      if (player.isBot) {
+        const bot = new BotAI(player.id, player.role);
+        this.bots.set(player.id, bot);
+      }
+    });
+
     this.interval = setInterval(() => this.tick(), CONSTANTS.TICK_INTERVAL);
   }
 
@@ -77,6 +88,9 @@ class GameLoop {
     if (state.phase !== CONSTANTS.PHASES.PLAYING) {
       return;
     }
+
+    // Generate bot inputs
+    this.updateBotInputs(state);
 
     // Process player inputs
     this.processInputs(state, delta);
@@ -318,6 +332,9 @@ class GameLoop {
     const state = this.room.gameState;
     state.voteTimer -= delta;
 
+    // Add bot votes automatically
+    this.addBotVotes();
+
     // Broadcast vote status
     let giveVotes = 0;
     let refuseVotes = 0;
@@ -432,6 +449,28 @@ class GameLoop {
 
   handleInput(playerId, input) {
     this.inputs.set(playerId, input);
+  }
+
+  updateBotInputs(state) {
+    this.bots.forEach((bot, botId) => {
+      const player = this.room.players.find(p => p.id === botId);
+      if (player) {
+        bot.updateRole(player.role);
+        const input = bot.generateInput(state);
+        this.inputs.set(botId, input);
+      }
+    });
+  }
+
+  addBotVotes() {
+    const state = this.room.gameState;
+    // Bots vote to give if they have items, refuse if not
+    this.bots.forEach((bot, botId) => {
+      if (!state.votes[botId]) {
+        const vote = state.inventory.length > 0 ? 'give' : 'refuse';
+        state.votes[botId] = vote;
+      }
+    });
   }
 
   broadcast() {

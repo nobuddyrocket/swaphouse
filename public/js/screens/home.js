@@ -1,5 +1,7 @@
 // Home Screen Logic
 const HomeScreen = {
+  selectedPlayerCount: 2,
+
   init() {
     this.bindEvents();
     this.setupSocketListeners();
@@ -9,19 +11,55 @@ const HomeScreen = {
     const createBtn = document.getElementById('create-room-btn');
     const joinBtn = document.getElementById('join-room-btn');
     const confirmJoinBtn = document.getElementById('confirm-join-btn');
+    const confirmCreateBtn = document.getElementById('confirm-create-btn');
+    const cancelCreateBtn = document.getElementById('cancel-create-btn');
     const joinForm = document.getElementById('join-form');
+    const playerCountSelect = document.getElementById('player-count-select');
+    const mainButtons = document.getElementById('main-buttons');
+    const countBtns = document.querySelectorAll('.count-btn');
 
+    // Show player count selection when clicking Create Room
     createBtn.addEventListener('click', () => {
       const name = document.getElementById('player-name').value.trim();
       if (!name) {
         this.showError('Please enter your name');
         return;
       }
+      mainButtons.classList.add('hidden');
+      joinForm.classList.add('hidden');
+      playerCountSelect.classList.remove('hidden');
+    });
+
+    // Player count buttons
+    countBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        countBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedPlayerCount = parseInt(btn.dataset.count);
+      });
+    });
+
+    // Select default (2 players)
+    countBtns[1].classList.add('selected');
+
+    // Confirm create room
+    confirmCreateBtn.addEventListener('click', () => {
+      const name = document.getElementById('player-name').value.trim();
       GameState.playerName = name;
-      SocketManager.emit('create-room', name);
+      SocketManager.emit('create-room', {
+        playerName: name,
+        totalPlayers: this.selectedPlayerCount
+      });
+    });
+
+    // Cancel create
+    cancelCreateBtn.addEventListener('click', () => {
+      playerCountSelect.classList.add('hidden');
+      mainButtons.classList.remove('hidden');
     });
 
     joinBtn.addEventListener('click', () => {
+      playerCountSelect.classList.add('hidden');
       joinForm.classList.toggle('hidden');
     });
 
@@ -49,6 +87,7 @@ const HomeScreen = {
       GameState.playerId = data.playerId;
       GameState.isHost = true;
       GameState.players = data.players;
+      GameState.totalPlayers = data.totalPlayers;
       UI.showScreen('lobby');
       LobbyScreen.update();
     });
@@ -58,6 +97,7 @@ const HomeScreen = {
       GameState.playerId = data.playerId;
       GameState.isHost = data.hostId === data.playerId;
       GameState.players = data.players;
+      GameState.totalPlayers = data.totalPlayers;
       UI.showScreen('lobby');
       LobbyScreen.update();
     });

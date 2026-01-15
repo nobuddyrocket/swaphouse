@@ -31,15 +31,20 @@ io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
   // Create room
-  socket.on('create-room', (playerName) => {
-    const room = roomManager.createRoom(socket.id, playerName);
+  socket.on('create-room', (data) => {
+    // Support both old format (string) and new format (object)
+    const playerName = typeof data === 'string' ? data : data.playerName;
+    const totalPlayers = typeof data === 'object' ? data.totalPlayers : 2;
+
+    const room = roomManager.createRoom(socket.id, playerName, totalPlayers);
     socket.join(room.roomId);
     socket.emit('room-created', {
       roomId: room.roomId,
       playerId: socket.id,
-      players: room.players
+      players: room.players,
+      totalPlayers: room.totalPlayers
     });
-    console.log(`Room created: ${room.roomId} by ${playerName}`);
+    console.log(`Room created: ${room.roomId} by ${playerName} (${totalPlayers} players)`);
   });
 
   // Join room
@@ -56,7 +61,8 @@ io.on('connection', (socket) => {
       roomId: roomId,
       playerId: socket.id,
       players: result.room.players,
-      hostId: result.room.hostId
+      hostId: result.room.hostId,
+      totalPlayers: result.room.totalPlayers
     });
 
     // Notify others in room
@@ -83,14 +89,11 @@ io.on('connection', (socket) => {
     const room = roomManager.getRoomByPlayer(socket.id);
     if (!room) return;
     if (room.hostId !== socket.id) return;
-    if (room.players.length < 2) {
-      socket.emit('room-error', 'Need at least 2 players to start');
-      return;
-    }
 
-    // Check if all players are ready
-    const allReady = room.players.every(p => p.ready);
-    if (!allReady) {
+    // Check if all HUMAN players are ready (bots are always ready)
+    const humanPlayers = room.players.filter(p => !p.isBot);
+    const allHumansReady = humanPlayers.every(p => p.ready);
+    if (!allHumansReady) {
       socket.emit('room-error', 'All players must be ready');
       return;
     }
